@@ -1,4 +1,4 @@
-# 完整單檔自動取得版：不需要 beitou 資料夾
+# 完整單檔：成交自動取得、可比估值、房貸與家庭現金流
 # ===== beitou/etl.py =====
 """只接受臺北市買賣主檔；原始列與拒絕原因皆可追溯。"""
 import csv
@@ -352,6 +352,103 @@ def fetch_season(season, as_of):
         return {'ok': False, 'season': season, 'message': '官方資料暫不可取得、格式不符或無北投紀錄'}
 
 
+# ===== beitou/finance.py =====
+"""固定利率、本息平均攤還的情境試算；不代表銀行核貸。金額單位為元。"""
+from dataclasses import asdict, dataclass
+import math
+
+
+def payment(principal, annual_rate, months):
+    if not all(math.isfinite(v) for v in (principal, annual_rate, months)):
+        raise ValueError('數值必須有限')
+    if principal < 0 or annual_rate < 0 or months <= 0:
+        raise ValueError('本金/利率不得為負且期數須大於零')
+    if annual_rate == 0:
+        return principal / months
+    rate = annual_rate / 100 / 12
+    return principal * rate / (-math.expm1(-months * math.log1p(rate)))
+
+
+def amortize(principal, annual_rate, years, grace_years=0):
+    if not isinstance(years, int) or not isinstance(grace_years, int) or not 0 <= grace_years < years <= 50:
+        raise ValueError('年限須為整數，且 0 ≤ 寬限期 < 貸款年限 ≤ 50')
+    total_months, grace_months = years * 12, grace_years * 12
+    regular = payment(principal, annual_rate, total_months - grace_months)
+    if principal == 0:
+        return {'grace_payment': 0.0, 'regular_payment': 0.0, 'total_interest': 0.0,
+                'total_paid': 0.0, 'schedule': []}
+    balance, rows = principal, []
+    for month in range(1, total_months + 1):
+        interest = balance * annual_rate / 100 / 12
+        repaid = 0.0 if month <= grace_months else min(balance, max(0.0, regular - interest))
+        if month == total_months:
+            repaid = balance
+        balance = max(0.0, balance - repaid)
+        rows.append({'month': month, 'payment': interest + repaid,
+                     'principal': repaid, 'interest': interest, 'balance': balance})
+    return {'grace_payment': principal * annual_rate / 100 / 12 if grace_months else 0.0,
+            'regular_payment': regular, 'total_interest': sum(r['interest'] for r in rows),
+            'total_paid': sum(r['payment'] for r in rows), 'schedule': rows}
+
+
+@dataclass
+class Purchase:
+    price: float = 15_000_000
+    down_payment: float = 3_750_000
+    available_cash: float = 5_000_000
+    transaction_cost: float = 750_000
+    renovation_cost: float = 0
+    monthly_income: float = 120_000
+    monthly_living: float = 40_000
+    monthly_other_debt: float = 0
+    monthly_holding: float = 5_000
+    annual_rate: float = 2.5
+    years: int = 30
+    grace_years: int = 0
+    reserve_months: int = 6
+
+
+def analyze_purchase(inputs):
+    values = asdict(inputs)
+    if not all(isinstance(v, (int, float)) and math.isfinite(v) and v >= 0 for v in values.values()):
+        raise ValueError('所有輸入須為非負有限數值')
+    if inputs.price <= 0 or inputs.monthly_income <= 0 or inputs.down_payment > inputs.price:
+        raise ValueError('房價及月收入須大於零，頭期款不得超過房價')
+    if not isinstance(inputs.reserve_months, int) or inputs.reserve_months < 1:
+        raise ValueError('緊急預備金月份須為正整數')
+    principal = inputs.price - inputs.down_payment
+    loan = amortize(principal, inputs.annual_rate, inputs.years, inputs.grace_years)
+    fixed_expenses = inputs.monthly_living + inputs.monthly_other_debt + inputs.monthly_holding
+    monthly_expenses = fixed_expenses + loan['regular_payment']
+    cash_needed = inputs.down_payment + inputs.transaction_cost + inputs.renovation_cost
+    remaining = inputs.available_cash - cash_needed
+    reserve_target = monthly_expenses * inputs.reserve_months
+    scenarios = []
+    for delta in (0.0, 0.5, 1.0, 2.0):
+        rate = inputs.annual_rate + delta
+        case = amortize(principal, rate, inputs.years, inputs.grace_years)
+        scenarios.append({'rate_percent': rate, 'grace_payment': case['grace_payment'],
+                          'regular_payment': case['regular_payment'], 'total_interest': case['total_interest'],
+                          'monthly_surplus': inputs.monthly_income - fixed_expenses - case['regular_payment']})
+    issues = []
+    if remaining < 0:
+        issues.append('購屋當下資金不足')
+    if inputs.monthly_income - monthly_expenses < 0:
+        issues.append('攤還期每月現金流為負')
+    if remaining < reserve_target:
+        issues.append('購屋後現金未達自訂緊急預備金目標')
+    if loan['regular_payment'] / inputs.monthly_income > 1 / 3:
+        issues.append('房貸月付超過月收入三分之一的規劃參考線（非核貸規則）')
+    return {'inputs': values, 'principal': principal, 'loan_to_price_percent': principal / inputs.price * 100,
+            'cash_needed': cash_needed, 'cash_remaining': remaining, 'reserve_target': reserve_target,
+            'reserve_gap': max(0.0, reserve_target - remaining),
+            'monthly_surplus': inputs.monthly_income - monthly_expenses,
+            'grace_monthly_surplus': inputs.monthly_income - fixed_expenses - loan['grace_payment'] if inputs.grace_years else None,
+            'mortgage_income_percent': loan['regular_payment'] / inputs.monthly_income * 100,
+            'debt_income_percent': (loan['regular_payment'] + inputs.monthly_other_debt) / inputs.monthly_income * 100,
+            'issues': issues, 'scenarios': scenarios, 'loan': loan}
+
+
 # ===== app.py =====
 import json
 import os
@@ -362,6 +459,7 @@ from datetime import date
 from pathlib import Path
 
 import streamlit as st
+import pandas as pd
 
 
 
@@ -370,8 +468,8 @@ def cached_official_season(season, as_of):
     # 只共用官方公開資料；訪客上傳與個別資料庫不進入共用快取。
     return fetch_season(season, as_of)
 
-st.set_page_config(page_title='北投首購｜成交研究', page_icon='🏠', layout='wide')
-st.title('北投區首購｜實價登錄與估值')
+st.set_page_config(page_title='北投首購｜成交與房貸', page_icon='🏠', layout='wide')
+st.title('北投區首購｜成交、房貸與現金流')
 st.caption('資料來源：內政部實價登錄公開買賣資料｜成交價研究｜不混用房仲刊登開價')
 st.warning('估值為歷史可比成交分布，非鑑價、銀行核貸或保證成交價格。車位另計；屋況、產權、捷運步行距離均未查核。')
 def setting(name, default=''):
@@ -397,7 +495,7 @@ if '_engine' not in st.session_state:
         st.error('資料庫連線或快照初始化失敗，請由管理者檢查 Cloud logs 與 Secrets。')
         st.stop()
 engine = st.session_state['_engine']
-page = st.sidebar.radio('功能', ['資料匯入與品質', '成交查詢', '可比估值'])
+page = st.sidebar.radio('功能', ['資料匯入與品質', '成交查詢', '可比估值', '房貸試算', '家庭現金流'])
 st.sidebar.markdown('[官方下載與授權](https://plvr.land.moi.gov.tw/DownloadOpenData)')
 st.sidebar.caption('只接受官方臺北市買賣主檔；空白畫面不會自動填入假行情。')
 can_import = not shared_database
@@ -413,7 +511,7 @@ else:
     st.sidebar.info('個人暫存模式：資料只在本次連線使用，重新整理或重啟後可能清空。')
 
 auto_enabled = str(setting('AUTO_LOAD', 'true')).lower() in ('true', '1', 'yes')
-if not shared_database and auto_enabled:
+if not shared_database and auto_enabled and page not in ('房貸試算', '家庭現金流'):
     st.sidebar.caption('首次開啟自動載入最近可取得的最多2季；官方資料快取6小時。')
     if st.sidebar.button('重新取得官方資料'):
         cached_official_season.clear()
@@ -497,7 +595,7 @@ elif page == '成交查詢':
         st.caption('單價及總價已扣除可明確拆分的車位；成交查詢可能含隔離中的更正版本，估值會另行排除。')
         st.dataframe(pool[['road', 'building_type', 'trade_date', 'area_ping', 'unit_wan', 'net_price', 'age', 'floor']], hide_index=True)
         st.download_button('匯出查詢 CSV', pool.to_csv(index=False).encode('utf-8-sig'), 'transactions.csv', 'text/csv')
-else:
+elif page == '可比估值':
     st.subheader('輸入待估房屋條件')
     with st.form('target'):
         road = st.text_input('完整路段（含段別，例如中央北路三段）', '中央北路三段')
@@ -525,3 +623,80 @@ else:
             st.download_button('下載估值證據 JSON', json.dumps(result, ensure_ascii=False, indent=2), 'valuation.json')
         except ValueError as exc:
             st.error(str(exc))
+else:
+    st.subheader(page + '｜可調整購屋情境')
+    st.info('此頁不需先匯入成交資料。下列利率、費用及貸款條件均為使用者情境，不是銀行報價或核貸結果。')
+    st.caption('家庭收入及購屋試算僅留在本次連線，不寫入成交資料庫；需要保存時可下載試算 JSON。')
+    with st.form('purchase_scenario'):
+        left, right = st.columns(2)
+        with left:
+            price_wan = st.number_input('購屋總價（萬元）', 1.0, 100000.0, 1500.0, key='buy_price')
+            down_wan = st.number_input('頭期款（萬元，可調整）', 0.0, 100000.0, 375.0, key='buy_down')
+            cash_wan = st.number_input('可動用購屋現金（萬元）', 0.0, 100000.0, 500.0, key='buy_cash')
+            cost_wan = st.number_input('交易費用預留（萬元，非固定稅率）', 0.0, 10000.0, 75.0, key='buy_cost')
+            renovation_wan = st.number_input('裝修與搬家預留（萬元）', 0.0, 10000.0, 0.0, key='buy_renovation')
+            annual_rate = st.number_input('情境年利率（%）', 0.0, 20.0, 2.5, 0.1, key='buy_rate')
+            years = st.number_input('貸款總年限（含寬限期）', 1, 50, 30, key='buy_years')
+            grace = st.number_input('本金寬限期（年，0表示沒有）', 0, 49, 0, key='buy_grace')
+        with right:
+            income = st.number_input('家庭每月實領收入（元）', 1.0, 10000000.0, 120000.0, key='buy_income')
+            living = st.number_input('每月生活費（元，不含房貸）', 0.0, 10000000.0, 40000.0, key='buy_living')
+            debt = st.number_input('其他貸款每月還款（元）', 0.0, 10000000.0, 0.0, key='buy_debt')
+            holding = st.number_input('每月持有成本預留（元）', 0.0, 1000000.0, 5000.0, key='buy_holding')
+            reserve = st.number_input('緊急預備金目標（月）', 1, 36, 6, key='buy_reserve')
+            st.caption('持有成本可含管理費、修繕、保險及房屋持有稅費月均預留；請避免與其他欄位重複計入。')
+        submitted = st.form_submit_button('計算房貸與購屋現金流')
+    if submitted:
+        try:
+            purchase = Purchase(price_wan * 10000, down_wan * 10000, cash_wan * 10000,
+                                cost_wan * 10000, renovation_wan * 10000, income, living, debt, holding,
+                                annual_rate, int(years), int(grace), int(reserve))
+            st.session_state['_purchase_report'] = analyze_purchase(purchase)
+        except ValueError as exc:
+            st.session_state.pop('_purchase_report', None)
+            st.error(str(exc))
+    if '_purchase_report' not in st.session_state and not submitted:
+        st.session_state['_purchase_report'] = analyze_purchase(Purchase())
+    if '_purchase_report' in st.session_state:
+        result = st.session_state['_purchase_report']
+        loan = result['loan']
+        st.caption('下列結果依最近一次試算條件顯示；修改上方欄位後請按計算更新。預設：房價1500萬、頭期款375萬、可動用現金500萬、月收入12萬。')
+        a, b, c = st.columns(3)
+        a.metric('貸款本金', f"{result['principal'] / 10000:,.1f} 萬元")
+        b.metric('攤還期每月房貸', f"{loan['regular_payment']:,.0f} 元")
+        c.metric('攤還期每月結餘', f"{result['monthly_surplus']:,.0f} 元")
+        a, b, c = st.columns(3)
+        a.metric('購屋後剩餘現金', f"{result['cash_remaining'] / 10000:,.1f} 萬元")
+        b.metric('全期利息', f"{loan['total_interest'] / 10000:,.1f} 萬元")
+        c.metric('房貸占收入', f"{result['mortgage_income_percent']:.1f}%")
+        if result['inputs']['grace_years']:
+            st.write(f"寬限期月付 {loan['grace_payment']:,.0f} 元；寬限期後月付 {loan['regular_payment']:,.0f} 元。")
+            st.write(f"寬限期每月結餘 {result['grace_monthly_surplus']:,.0f} 元；本金並未在寬限期下降。")
+        for issue in result['issues']:
+            st.warning(issue)
+        st.write(f"自訂緊急預備金目標 {result['reserve_target'] / 10000:,.1f} 萬元；與購屋後現金的缺口 {result['reserve_gap'] / 10000:,.1f} 萬元。")
+        st.caption('預備金以生活費＋其他貸款＋持有成本＋寬限期後房貸，乘上指定月份估算。')
+        st.write('利率壓力比較：基準、增加0.5、1與2個百分點，均假設該情境利率維持全期。')
+        scenarios = pd.DataFrame(result['scenarios']).rename(columns={
+            'rate_percent': '情境年利率(%)', 'grace_payment': '寬限期月付(元)',
+            'regular_payment': '攤還期月付(元)', 'total_interest': '全期利息(元)', 'monthly_surplus': '攤還期月結餘(元)'})
+        if not result['inputs']['grace_years']:
+            scenarios = scenarios.drop(columns=['寬限期月付(元)'])
+        st.dataframe(scenarios, hide_index=True)
+        st.bar_chart(scenarios.set_index('情境年利率(%)')[['攤還期月付(元)']])
+        if page == '家庭現金流':
+            i = result['inputs']
+            cash_table = pd.DataFrame({'項目': ['每月收入', '生活費', '其他貸款', '持有成本', '攤還期房貸', '每月結餘'],
+                '金額（元）': [i['monthly_income'], -i['monthly_living'], -i['monthly_other_debt'],
+                              -i['monthly_holding'], -loan['regular_payment'], result['monthly_surplus']]})
+            st.dataframe(cash_table, hide_index=True)
+            st.write(f"一次性資金需求：頭期款＋交易費用＋裝修搬家 = {result['cash_needed'] / 10000:,.1f} 萬元。")
+            st.write(f"貸款占購屋總價 {result['loan_to_price_percent']:.1f}%；房貸及其他貸款合計占收入 {result['debt_income_percent']:.1f}%。")
+        with st.expander('逐月攤還明細'):
+            schedule = pd.DataFrame(loan['schedule']).rename(columns={'month': '期數', 'payment': '月付(元)',
+                'principal': '本金(元)', 'interest': '利息(元)', 'balance': '剩餘本金(元)'})
+            st.dataframe(schedule, hide_index=True)
+            st.download_button('下載攤還明細 CSV', schedule.to_csv(index=False).encode('utf-8-sig'), 'mortgage-schedule.csv')
+        st.download_button('下載購屋試算 JSON', json.dumps(result, ensure_ascii=False, indent=2), 'purchase-scenario.json')
+        st.caption('本息平均攤還、按月計息、全期固定利率；銀行逐日計息、四捨五入、浮動利率與額外費用可能不同。寬限期包含在總年限內；不模擬提前清償。')
+        st.markdown('[金管會金融智慧網：房貸與寬限期說明](https://moneywise.fsc.gov.tw/uploaddowndoc?file=publicizeinfo%2F202109241416010.pdf&filedisplay=%E9%8A%80%E8%A1%8C%E7%AF%87.pdf&flag=doc)')
