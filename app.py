@@ -1,4 +1,4 @@
-# 完整單檔 Streamlit Cloud 應用：不需要 beitou 資料夾
+# 完整單檔自動取得版：不需要 beitou 資料夾
 # ===== beitou/etl.py =====
 """只接受臺北市買賣主檔；原始列與拒絕原因皆可追溯。"""
 import csv
@@ -321,6 +321,37 @@ def estimate(frame, target):
     return result
 
 
+# ===== beitou/auto.py =====
+"""有界的官方季度資料取得；不把下載失敗視為零成交。"""
+import logging
+import tempfile
+from pathlib import Path
+
+
+
+def candidate_seasons(as_of, count=3):
+    quarter_index = as_of.year * 4 + (as_of.month - 1) // 3 - 1
+    seasons = []
+    for offset in range(count):
+        year, quarter = divmod(quarter_index - offset, 4)
+        seasons.append(f'{year - 1911}S{quarter + 1}')
+    return seasons
+
+
+def fetch_season(season, as_of):
+    try:
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'official.zip'
+            meta = download(season, path)
+            frame = clean(path.read_bytes(), path.name, as_of)
+        if frame.empty or not (frame.district == '北投區').any():
+            raise ValueError('無北投區紀錄')
+        return {'ok': True, 'season': season, 'frame': frame, 'metadata': meta}
+    except Exception:
+        logging.exception('自動取得官方季別 %s 失敗', season)
+        return {'ok': False, 'season': season, 'message': '官方資料暫不可取得、格式不符或無北投紀錄'}
+
+
 # ===== app.py =====
 import json
 import os
@@ -332,6 +363,12 @@ from pathlib import Path
 
 import streamlit as st
 
+
+
+@st.cache_data(ttl=21600, max_entries=8, show_spinner=False)
+def cached_official_season(season, as_of):
+    # 只共用官方公開資料；訪客上傳與個別資料庫不進入共用快取。
+    return fetch_season(season, as_of)
 
 st.set_page_config(page_title='北投首購｜成交研究', page_icon='🏠', layout='wide')
 st.title('北投區首購｜實價登錄與估值')
@@ -374,6 +411,48 @@ if shared_database:
         st.sidebar.caption('管理密碼未設定，網頁匯入功能已關閉。')
 else:
     st.sidebar.info('個人暫存模式：資料只在本次連線使用，重新整理或重啟後可能清空。')
+
+auto_enabled = str(setting('AUTO_LOAD', 'true')).lower() in ('true', '1', 'yes')
+if not shared_database and auto_enabled:
+    st.sidebar.caption('首次開啟自動載入最近可取得的最多2季；官方資料快取6小時。')
+    if st.sidebar.button('重新取得官方資料'):
+        cached_official_season.clear()
+        st.session_state.pop('_auto_attempted', None)
+        st.session_state['_auto_force'] = True
+    if not st.session_state.get('_auto_attempted'):
+        st.session_state['_auto_attempted'] = True
+        force = st.session_state.pop('_auto_force', False)
+        if force or load(engine).empty:
+            results, successes = [], 0
+            with st.spinner('正在自動取得內政部成交資料，首次載入可能需要一些時間…'):
+                progress = st.empty()
+                for auto_season in candidate_seasons(taipei_today()):
+                    progress.info(f'正在取得 {auto_season} 官方資料…')
+                    item = cached_official_season(auto_season, taipei_today())
+                    if item['ok']:
+                        report = save(engine, item['frame'], item['metadata']['source_url'])
+                        results.append({'season': auto_season, 'ok': True,
+                                        'metadata': item['metadata'], 'report': report})
+                        successes += 1
+                    else:
+                        results.append({k: v for k, v in item.items() if k != 'frame'})
+                    if successes == 2:
+                        break
+                progress.empty()
+            st.session_state['_auto_results'] = results
+    if st.session_state.get('_auto_results'):
+        auto_results = st.session_state['_auto_results']
+        acquired = [x['season'] for x in auto_results if x['ok']]
+        if acquired:
+            st.success('已自動載入官方資料：' + '、'.join(acquired))
+            st.caption('這是近期可取得的季度資料，不代表完整兩年或即時行情；案例不足時仍不估價。')
+        else:
+            st.warning('官方自動下載暫時失敗。可按左側「重新取得官方資料」，或使用下方手動上傳；不代表沒有成交。')
+        if any(not x['ok'] for x in auto_results) and acquired:
+            st.warning('部分季別暫不可取得，已使用較早的可用資料；請核對實際載入季別。')
+        with st.expander('自動取得紀錄與來源'):
+            st.json(auto_results)
+            st.download_button('下載自動取得紀錄', json.dumps(auto_results, ensure_ascii=False, indent=2), 'auto-source.json')
 
 if page == '資料匯入與品質':
     st.subheader('下載或匯入官方公開資料')
