@@ -1,6 +1,502 @@
-# 完整單檔：成交自動取得、可比估值、房貸與家庭現金流
+# 全台首購：完整單檔，含22縣市368鄉鎮市區官方清單
+# ===== beitou/regions.py =====
+"""國土測繪中心戶政行政區清單，2026-11-06查核；離線內嵌，不依賴訪客即時呼叫。"""
+
+
+def canonical_city(value):
+    for name in REGIONS:
+        if name.replace('臺', '台') == value.strip().replace('臺', '台'):
+            return name
+    raise ValueError('不支援的縣市')
+
+
+def filename_for_city(city):
+    return REGIONS[canonical_city(city)]['code'].lower() + '_lvr_land_a.csv'
+REGION_SOURCE = "https://api.nlsc.gov.tw/other/ListCounty ; https://api.nlsc.gov.tw/other/ListTown1/{countycode}"
+REGIONS = {
+  "臺北市": {
+    "code": "A",
+    "districts": {
+      "松山區": "63000010",
+      "信義區": "63000020",
+      "大安區": "63000030",
+      "中山區": "63000040",
+      "中正區": "63000050",
+      "大同區": "63000060",
+      "萬華區": "63000070",
+      "文山區": "63000080",
+      "南港區": "63000090",
+      "內湖區": "63000100",
+      "士林區": "63000110",
+      "北投區": "63000120"
+    }
+  },
+  "臺中市": {
+    "code": "B",
+    "districts": {
+      "中區": "66000010",
+      "東區": "66000020",
+      "南區": "66000030",
+      "西區": "66000040",
+      "北區": "66000050",
+      "西屯區": "66000060",
+      "南屯區": "66000070",
+      "北屯區": "66000080",
+      "豐原區": "66000090",
+      "東勢區": "66000100",
+      "大甲區": "66000110",
+      "清水區": "66000120",
+      "沙鹿區": "66000130",
+      "梧棲區": "66000140",
+      "后里區": "66000150",
+      "神岡區": "66000160",
+      "潭子區": "66000170",
+      "大雅區": "66000180",
+      "新社區": "66000190",
+      "石岡區": "66000200",
+      "外埔區": "66000210",
+      "大安區": "66000220",
+      "烏日區": "66000230",
+      "大肚區": "66000240",
+      "龍井區": "66000250",
+      "霧峰區": "66000260",
+      "太平區": "66000270",
+      "大里區": "66000280",
+      "和平區": "66000290"
+    }
+  },
+  "基隆市": {
+    "code": "C",
+    "districts": {
+      "中正區": "10017010",
+      "七堵區": "10017020",
+      "暖暖區": "10017030",
+      "仁愛區": "10017040",
+      "中山區": "10017050",
+      "安樂區": "10017060",
+      "信義區": "10017070"
+    }
+  },
+  "臺南市": {
+    "code": "D",
+    "districts": {
+      "新營區": "67000010",
+      "鹽水區": "67000020",
+      "白河區": "67000030",
+      "柳營區": "67000040",
+      "後壁區": "67000050",
+      "東山區": "67000060",
+      "麻豆區": "67000070",
+      "下營區": "67000080",
+      "六甲區": "67000090",
+      "官田區": "67000100",
+      "大內區": "67000110",
+      "佳里區": "67000120",
+      "學甲區": "67000130",
+      "西港區": "67000140",
+      "七股區": "67000150",
+      "將軍區": "67000160",
+      "北門區": "67000170",
+      "新化區": "67000180",
+      "善化區": "67000190",
+      "新市區": "67000200",
+      "安定區": "67000210",
+      "山上區": "67000220",
+      "玉井區": "67000230",
+      "楠西區": "67000240",
+      "南化區": "67000250",
+      "左鎮區": "67000260",
+      "仁德區": "67000270",
+      "歸仁區": "67000280",
+      "關廟區": "67000290",
+      "龍崎區": "67000300",
+      "永康區": "67000310",
+      "東區": "67000320",
+      "南區": "67000330",
+      "北區": "67000340",
+      "安南區": "67000350",
+      "安平區": "67000360",
+      "中西區": "67000370"
+    }
+  },
+  "高雄市": {
+    "code": "E",
+    "districts": {
+      "鹽埕區": "64000010",
+      "鼓山區": "64000020",
+      "左營區": "64000030",
+      "楠梓區": "64000040",
+      "三民區": "64000050",
+      "新興區": "64000060",
+      "前金區": "64000070",
+      "苓雅區": "64000080",
+      "前鎮區": "64000090",
+      "旗津區": "64000100",
+      "小港區": "64000110",
+      "鳳山區": "64000120",
+      "林園區": "64000130",
+      "大寮區": "64000140",
+      "大樹區": "64000150",
+      "大社區": "64000160",
+      "仁武區": "64000170",
+      "鳥松區": "64000180",
+      "岡山區": "64000190",
+      "橋頭區": "64000200",
+      "燕巢區": "64000210",
+      "田寮區": "64000220",
+      "阿蓮區": "64000230",
+      "路竹區": "64000240",
+      "湖內區": "64000250",
+      "茄萣區": "64000260",
+      "永安區": "64000270",
+      "彌陀區": "64000280",
+      "梓官區": "64000290",
+      "旗山區": "64000300",
+      "美濃區": "64000310",
+      "六龜區": "64000320",
+      "甲仙區": "64000330",
+      "杉林區": "64000340",
+      "內門區": "64000350",
+      "茂林區": "64000360",
+      "桃源區": "64000370",
+      "那瑪夏區": "64000380"
+    }
+  },
+  "新北市": {
+    "code": "F",
+    "districts": {
+      "板橋區": "65000010",
+      "三重區": "65000020",
+      "中和區": "65000030",
+      "永和區": "65000040",
+      "新莊區": "65000050",
+      "新店區": "65000060",
+      "樹林區": "65000070",
+      "鶯歌區": "65000080",
+      "三峽區": "65000090",
+      "淡水區": "65000100",
+      "汐止區": "65000110",
+      "瑞芳區": "65000120",
+      "土城區": "65000130",
+      "蘆洲區": "65000140",
+      "五股區": "65000150",
+      "泰山區": "65000160",
+      "林口區": "65000170",
+      "深坑區": "65000180",
+      "石碇區": "65000190",
+      "坪林區": "65000200",
+      "三芝區": "65000210",
+      "石門區": "65000220",
+      "八里區": "65000230",
+      "平溪區": "65000240",
+      "雙溪區": "65000250",
+      "貢寮區": "65000260",
+      "金山區": "65000270",
+      "萬里區": "65000280",
+      "烏來區": "65000290"
+    }
+  },
+  "宜蘭縣": {
+    "code": "G",
+    "districts": {
+      "宜蘭市": "10002010",
+      "羅東鎮": "10002020",
+      "蘇澳鎮": "10002030",
+      "頭城鎮": "10002040",
+      "礁溪鄉": "10002050",
+      "壯圍鄉": "10002060",
+      "員山鄉": "10002070",
+      "冬山鄉": "10002080",
+      "五結鄉": "10002090",
+      "三星鄉": "10002100",
+      "大同鄉": "10002110",
+      "南澳鄉": "10002120"
+    }
+  },
+  "桃園市": {
+    "code": "H",
+    "districts": {
+      "桃園區": "68000010",
+      "中壢區": "68000020",
+      "大溪區": "68000030",
+      "楊梅區": "68000040",
+      "蘆竹區": "68000050",
+      "大園區": "68000060",
+      "龜山區": "68000070",
+      "八德區": "68000080",
+      "龍潭區": "68000090",
+      "平鎮區": "68000100",
+      "新屋區": "68000110",
+      "觀音區": "68000120",
+      "復興區": "68000130"
+    }
+  },
+  "嘉義市": {
+    "code": "I",
+    "districts": {
+      "東區": "10020010",
+      "西區": "10020020"
+    }
+  },
+  "新竹縣": {
+    "code": "J",
+    "districts": {
+      "竹北市": "10004010",
+      "竹東鎮": "10004020",
+      "新埔鎮": "10004030",
+      "關西鎮": "10004040",
+      "湖口鄉": "10004050",
+      "新豐鄉": "10004060",
+      "芎林鄉": "10004070",
+      "橫山鄉": "10004080",
+      "北埔鄉": "10004090",
+      "寶山鄉": "10004100",
+      "峨眉鄉": "10004110",
+      "尖石鄉": "10004120",
+      "五峰鄉": "10004130"
+    }
+  },
+  "苗栗縣": {
+    "code": "K",
+    "districts": {
+      "苗栗市": "10005010",
+      "苑裡鎮": "10005020",
+      "通霄鎮": "10005030",
+      "竹南鎮": "10005040",
+      "頭份市": "10005050",
+      "後龍鎮": "10005060",
+      "卓蘭鎮": "10005070",
+      "大湖鄉": "10005080",
+      "公館鄉": "10005090",
+      "銅鑼鄉": "10005100",
+      "南庄鄉": "10005110",
+      "頭屋鄉": "10005120",
+      "三義鄉": "10005130",
+      "西湖鄉": "10005140",
+      "造橋鄉": "10005150",
+      "三灣鄉": "10005160",
+      "獅潭鄉": "10005170",
+      "泰安鄉": "10005180"
+    }
+  },
+  "南投縣": {
+    "code": "M",
+    "districts": {
+      "南投市": "10008010",
+      "埔里鎮": "10008020",
+      "草屯鎮": "10008030",
+      "竹山鎮": "10008040",
+      "集集鎮": "10008050",
+      "名間鄉": "10008060",
+      "鹿谷鄉": "10008070",
+      "中寮鄉": "10008080",
+      "魚池鄉": "10008090",
+      "國姓鄉": "10008100",
+      "水里鄉": "10008110",
+      "信義鄉": "10008120",
+      "仁愛鄉": "10008130"
+    }
+  },
+  "彰化縣": {
+    "code": "N",
+    "districts": {
+      "彰化市": "10007010",
+      "鹿港鎮": "10007020",
+      "和美鎮": "10007030",
+      "線西鄉": "10007040",
+      "伸港鄉": "10007050",
+      "福興鄉": "10007060",
+      "秀水鄉": "10007070",
+      "花壇鄉": "10007080",
+      "芬園鄉": "10007090",
+      "員林市": "10007100",
+      "溪湖鎮": "10007110",
+      "田中鎮": "10007120",
+      "大村鄉": "10007130",
+      "埔鹽鄉": "10007140",
+      "埔心鄉": "10007150",
+      "永靖鄉": "10007160",
+      "社頭鄉": "10007170",
+      "二水鄉": "10007180",
+      "北斗鎮": "10007190",
+      "二林鎮": "10007200",
+      "田尾鄉": "10007210",
+      "埤頭鄉": "10007220",
+      "芳苑鄉": "10007230",
+      "大城鄉": "10007240",
+      "竹塘鄉": "10007250",
+      "溪州鄉": "10007260"
+    }
+  },
+  "新竹市": {
+    "code": "O",
+    "districts": {
+      "東區": "10018010",
+      "北區": "10018020",
+      "香山區": "10018030"
+    }
+  },
+  "雲林縣": {
+    "code": "P",
+    "districts": {
+      "斗六市": "10009010",
+      "斗南鎮": "10009020",
+      "虎尾鎮": "10009030",
+      "西螺鎮": "10009040",
+      "土庫鎮": "10009050",
+      "北港鎮": "10009060",
+      "古坑鄉": "10009070",
+      "大埤鄉": "10009080",
+      "莿桐鄉": "10009090",
+      "林內鄉": "10009100",
+      "二崙鄉": "10009110",
+      "崙背鄉": "10009120",
+      "麥寮鄉": "10009130",
+      "東勢鄉": "10009140",
+      "褒忠鄉": "10009150",
+      "臺西鄉": "10009160",
+      "元長鄉": "10009170",
+      "四湖鄉": "10009180",
+      "口湖鄉": "10009190",
+      "水林鄉": "10009200"
+    }
+  },
+  "嘉義縣": {
+    "code": "Q",
+    "districts": {
+      "太保市": "10010010",
+      "朴子市": "10010020",
+      "布袋鎮": "10010030",
+      "大林鎮": "10010040",
+      "民雄鄉": "10010050",
+      "溪口鄉": "10010060",
+      "新港鄉": "10010070",
+      "六腳鄉": "10010080",
+      "東石鄉": "10010090",
+      "義竹鄉": "10010100",
+      "鹿草鄉": "10010110",
+      "水上鄉": "10010120",
+      "中埔鄉": "10010130",
+      "竹崎鄉": "10010140",
+      "梅山鄉": "10010150",
+      "番路鄉": "10010160",
+      "大埔鄉": "10010170",
+      "阿里山鄉": "10010180"
+    }
+  },
+  "屏東縣": {
+    "code": "T",
+    "districts": {
+      "屏東市": "10013010",
+      "潮州鎮": "10013020",
+      "東港鎮": "10013030",
+      "恆春鎮": "10013040",
+      "萬丹鄉": "10013050",
+      "長治鄉": "10013060",
+      "麟洛鄉": "10013070",
+      "九如鄉": "10013080",
+      "里港鄉": "10013090",
+      "鹽埔鄉": "10013100",
+      "高樹鄉": "10013110",
+      "萬巒鄉": "10013120",
+      "內埔鄉": "10013130",
+      "竹田鄉": "10013140",
+      "新埤鄉": "10013150",
+      "枋寮鄉": "10013160",
+      "新園鄉": "10013170",
+      "崁頂鄉": "10013180",
+      "林邊鄉": "10013190",
+      "南州鄉": "10013200",
+      "佳冬鄉": "10013210",
+      "琉球鄉": "10013220",
+      "車城鄉": "10013230",
+      "滿州鄉": "10013240",
+      "枋山鄉": "10013250",
+      "三地門鄉": "10013260",
+      "霧臺鄉": "10013270",
+      "瑪家鄉": "10013280",
+      "泰武鄉": "10013290",
+      "來義鄉": "10013300",
+      "春日鄉": "10013310",
+      "獅子鄉": "10013320",
+      "牡丹鄉": "10013330"
+    }
+  },
+  "花蓮縣": {
+    "code": "U",
+    "districts": {
+      "花蓮市": "10015010",
+      "鳳林鎮": "10015020",
+      "玉里鎮": "10015030",
+      "新城鄉": "10015040",
+      "吉安鄉": "10015050",
+      "壽豐鄉": "10015060",
+      "光復鄉": "10015070",
+      "豐濱鄉": "10015080",
+      "瑞穗鄉": "10015090",
+      "富里鄉": "10015100",
+      "秀林鄉": "10015110",
+      "萬榮鄉": "10015120",
+      "卓溪鄉": "10015130"
+    }
+  },
+  "臺東縣": {
+    "code": "V",
+    "districts": {
+      "臺東市": "10014010",
+      "成功鎮": "10014020",
+      "關山鎮": "10014030",
+      "卑南鄉": "10014040",
+      "鹿野鄉": "10014050",
+      "池上鄉": "10014060",
+      "東河鄉": "10014070",
+      "長濱鄉": "10014080",
+      "太麻里鄉": "10014090",
+      "大武鄉": "10014100",
+      "綠島鄉": "10014110",
+      "海端鄉": "10014120",
+      "延平鄉": "10014130",
+      "金峰鄉": "10014140",
+      "達仁鄉": "10014150",
+      "蘭嶼鄉": "10014160"
+    }
+  },
+  "金門縣": {
+    "code": "W",
+    "districts": {
+      "金城鎮": "09020010",
+      "金沙鎮": "09020020",
+      "金湖鎮": "09020030",
+      "金寧鄉": "09020040",
+      "烈嶼鄉": "09020050",
+      "烏坵鄉": "09020060"
+    }
+  },
+  "澎湖縣": {
+    "code": "X",
+    "districts": {
+      "馬公市": "10016010",
+      "湖西鄉": "10016020",
+      "白沙鄉": "10016030",
+      "西嶼鄉": "10016040",
+      "望安鄉": "10016050",
+      "七美鄉": "10016060"
+    }
+  },
+  "連江縣": {
+    "code": "Z",
+    "districts": {
+      "南竿鄉": "09007010",
+      "北竿鄉": "09007020",
+      "莒光鄉": "09007030",
+      "東引鄉": "09007040"
+    }
+  }
+}
+
+
 # ===== beitou/etl.py =====
-"""只接受臺北市買賣主檔；原始列與拒絕原因皆可追溯。"""
+"""依官方縣市代碼讀取買賣主檔；原始列與拒絕原因皆可追溯。"""
 import csv
 import hashlib
 import io
@@ -14,6 +510,7 @@ from pathlib import Path
 
 import pandas as pd
 import requests
+
 
 PING = 3.305785
 
@@ -66,8 +563,16 @@ def floor_number(value):
     raise ValueError('不支援地下/多層/特殊樓層')
 
 
-def road_key(address):
-    match = re.search(r'(?:台北市)?北投區(.+?(?:路|街|大道)(?:[一二三四五六七八九十0-9]+段)?)', norm(address))
+def road_key(address, city='臺北市', district='北投區'):
+    address = norm(address).replace('臺', '台')
+    city = norm(canonical_city(city)).replace('臺', '台')
+    district = district.replace('臺', '台')
+    if address.startswith(city):
+        address = address[len(city):]
+    if not address.startswith(district):
+        return ''
+    address = address[len(district):]
+    match = re.match(r'(.+?(?:大道|路|街)(?:[一二三四五六七八九十0-9]+段)?)', address)
     return match.group(1) if match else ''
 
 
@@ -97,19 +602,20 @@ def download(season, destination):
     return metadata
 
 
-def read_source(payload, filename):
+def read_source(payload, filename, city='臺北市'):
+    expected = filename_for_city(city)
     if len(payload) > 200_000_000:
         raise ValueError('檔案超過 200 MB')
     if filename.lower().endswith('.zip'):
         with zipfile.ZipFile(io.BytesIO(payload)) as archive:
-            members = [i for i in archive.infolist() if Path(i.filename).name.lower() == 'a_lvr_land_a.csv']
+            members = [i for i in archive.infolist() if Path(i.filename).name.lower() == expected]
             if len(members) != 1:
-                raise ValueError('ZIP 必須恰有一份臺北市買賣主檔 a_lvr_land_a.csv')
+                raise ValueError(f'ZIP 必須恰有一份 {city} 買賣主檔 {expected}')
             if members[0].file_size > 100_000_000:
                 raise ValueError('解壓後主檔超過 100 MB')
             payload = archive.read(members[0])
-    elif Path(filename).name.lower() != 'a_lvr_land_a.csv':
-        raise ValueError('CSV 請使用官方原名 a_lvr_land_a.csv，避免混入其他縣市/租賃/預售檔')
+    elif Path(filename).name.lower() != expected:
+        raise ValueError(f'目前選擇 {city}，CSV 必須是 {expected}，請勿改名混入其他縣市/租賃/預售檔')
     for encoding in ('utf-8-sig', 'cp950'):
         try:
             content = payload.decode(encoding)
@@ -127,23 +633,28 @@ def read_source(payload, filename):
     return list(reader)
 
 
-def clean(payload, filename, as_of=None):
+def clean(payload, filename, as_of=None, city='臺北市'):
+    city = canonical_city(city)
     as_of = as_of or taipei_today()
     file_hash = hashlib.sha256(payload).hexdigest()
     output = []
-    for line, raw in enumerate(read_source(payload, filename), start=2):
+    for line, raw in enumerate(read_source(payload, filename, city), start=2):
         if norm(raw.get('鄉鎮市區')).lower() == 'the villages and towns urban district':
             continue
         mapped = {k: norm(raw.get(v)) for k, v in FIELDS.items()}
-        digest = hashlib.sha256(json.dumps(raw, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
-        record = {'id': digest, 'serial': mapped['serial'], 'file_hash': file_hash,
+        for official_district in REGIONS[city]['districts']:
+            if official_district.replace('臺', '台') == mapped['district'].replace('臺', '台'):
+                mapped['district'] = official_district
+                break
+        digest = hashlib.sha256((city + '\n' + json.dumps(raw, ensure_ascii=False, sort_keys=True)).encode()).hexdigest()
+        record = {'id': digest, 'city': city, 'serial': mapped['serial'], 'file_hash': file_hash,
                   'source_file': Path(filename).name, 'source_line': line,
                   'raw_json': json.dumps(raw, ensure_ascii=False), 'district': mapped['district'],
-                  'address': mapped['address'], 'road': road_key(mapped['address']),
+                  'address': mapped['address'], 'road': road_key(mapped['address'], city, mapped['district']),
                   'building_type': mapped['building_type'], 'reasons': '', 'eligible': False}
         reasons = []
-        if mapped['district'] != '北投區':
-            reasons.append('非北投區')
+        if mapped['district'] not in REGIONS[city]['districts']:
+            reasons.append('行政區不在所選縣市清單')
         if mapped['subject'] not in ('房地(土地+建物)', '房地(土地+建物)+車位'):
             reasons.append('非完整房地買賣')
         if mapped['use'] != '住家用':
@@ -206,15 +717,15 @@ import pandas as pd
 from sqlalchemy import Boolean, Column, Float, Integer, MetaData, String, Table, Text, create_engine, select
 
 metadata = MetaData()
-transactions = Table('transactions', metadata,
-    Column('id', String(64), primary_key=True), Column('serial', Text),
+transactions = Table('transactions_v2', metadata,
+    Column('id', String(64), primary_key=True), Column('city', Text, index=True), Column('serial', Text),
     Column('file_hash', String(64)), Column('source_file', Text), Column('source_line', Integer),
     Column('raw_json', Text), Column('district', Text), Column('address', Text), Column('road', Text),
     Column('building_type', Text), Column('reasons', Text), Column('eligible', Boolean),
     Column('trade_date', String(10)), Column('completion_date', String(10)), Column('age', Float),
     Column('floor', Float), Column('total_floors', Float), Column('area_ping', Float),
     Column('net_price', Float), Column('unit_wan', Float), Column('parking_price', Float), Column('parking_area', Float))
-runs = Table('imports', metadata, Column('id', Integer, primary_key=True),
+runs = Table('imports_v2', metadata, Column('id', Integer, primary_key=True),
     Column('imported_at', Text), Column('source', Text), Column('report', Text))
 
 
@@ -249,9 +760,14 @@ def save(engine, frame, source):
     return report
 
 
-def load(engine):
+def load(engine, city=None, district=None):
+    query = select(transactions)
+    if city is not None:
+        query = query.where(transactions.c.city == city)
+    if district is not None:
+        query = query.where(transactions.c.district == district)
     with engine.connect() as conn:
-        return pd.DataFrame(conn.execute(select(transactions)).mappings().all(), columns=[c.name for c in transactions.columns])
+        return pd.DataFrame(conn.execute(query).mappings().all(), columns=[c.name for c in transactions.columns])
 
 
 # ===== beitou/value.py =====
@@ -260,6 +776,7 @@ from datetime import date
 import math
 
 import pandas as pd
+
 
 
 @dataclass
@@ -271,9 +788,14 @@ class Target:
     floor: int
     total_floors: int
     as_of: date
+    city: str = '臺北市'
+    district: str = '北投區'
 
 
 def estimate(frame, target):
+    city = canonical_city(target.city)
+    if target.district not in REGIONS[city]['districts']:
+        raise ValueError('行政區不屬於所選縣市')
     if (not target.road.strip() or not target.building_type.strip()
             or not all(math.isfinite(v) for v in [target.area_ping, target.age, target.floor, target.total_floors])
             or target.area_ping <= 0 or target.age < 0 or not 1 <= target.floor <= target.total_floors):
@@ -282,10 +804,11 @@ def estimate(frame, target):
     result = {'status': '資料不足', 'rules': rules, 'count': 0, 'confidence': '不足',
               'unit_interval_wan': None, 'price_interval_wan': None,
               'method': '可比案例單價第25至75百分位×目標不含車位坪數；非統計信賴區間；無時間漲跌調整',
-              'comparables': [], 'funnel': {}, 'as_of': target.as_of.isoformat()}
+              'comparables': [], 'funnel': {}, 'as_of': target.as_of.isoformat(),
+              'city': city, 'district': target.district}
     if frame.empty:
         return result
-    versions = frame.drop_duplicates('id')
+    versions = frame[(frame.city == city) & (frame.district == target.district)].drop_duplicates('id')
     pool = versions[versions.eligible == True].copy()
     # 同一官方編號出現不同版本時全部隔離；不擅自猜測哪一版為更正。
     serial = versions.serial.fillna('')
@@ -309,7 +832,7 @@ def estimate(frame, target):
         result['funnel'][name] = len(pool)
     pool = pool.sort_values(['trade_date', 'id'], ascending=[False, True]).head(30)
     result['count'] = len(pool)
-    result['comparables'] = pool[['id', 'serial', 'address', 'trade_date', 'area_ping', 'age', 'floor',
+    result['comparables'] = pool[['id', 'serial', 'city', 'district', 'address', 'trade_date', 'area_ping', 'age', 'floor',
                                   'unit_wan', 'net_price', 'file_hash', 'source_line']].to_dict('records')
     if len(pool) < 5:
         return result
@@ -338,18 +861,19 @@ def candidate_seasons(as_of, count=3):
     return seasons
 
 
-def fetch_season(season, as_of):
+def fetch_season(season, as_of, city='臺北市'):
     try:
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'official.zip'
             meta = download(season, path)
-            frame = clean(path.read_bytes(), path.name, as_of)
-        if frame.empty or not (frame.district == '北投區').any():
-            raise ValueError('無北投區紀錄')
+            frame = clean(path.read_bytes(), path.name, as_of, city)
+        if frame.empty:
+            raise ValueError('該縣市檔案無紀錄')
+        meta['city'] = city
         return {'ok': True, 'season': season, 'frame': frame, 'metadata': meta}
     except Exception:
         logging.exception('自動取得官方季別 %s 失敗', season)
-        return {'ok': False, 'season': season, 'message': '官方資料暫不可取得、格式不符或無北投紀錄'}
+        return {'ok': False, 'season': season, 'message': '官方資料暫不可取得、格式不符或該縣市無紀錄'}
 
 
 # ===== beitou/finance.py =====
@@ -464,12 +988,12 @@ import pandas as pd
 
 
 @st.cache_data(ttl=21600, max_entries=8, show_spinner=False)
-def cached_official_season(season, as_of):
+def cached_official_season(season, as_of, city):
     # 只共用官方公開資料；訪客上傳與個別資料庫不進入共用快取。
-    return fetch_season(season, as_of)
+    return fetch_season(season, as_of, city)
 
-st.set_page_config(page_title='北投首購｜成交與房貸', page_icon='🏠', layout='wide')
-st.title('北投區首購｜成交、房貸與現金流')
+st.set_page_config(page_title='全台首購｜成交、房貸與現金流', page_icon='🏠', layout='wide')
+st.title('全台首購｜成交、房貸與現金流')
 st.caption('資料來源：內政部實價登錄公開買賣資料｜成交價研究｜不混用房仲刊登開價')
 st.warning('估值為歷史可比成交分布，非鑑價、銀行核貸或保證成交價格。車位另計；屋況、產權、捷運步行距離均未查核。')
 def setting(name, default=''):
@@ -482,22 +1006,39 @@ def setting(name, default=''):
         return default
 
 
+city = st.sidebar.selectbox('縣市', list(REGIONS), index=list(REGIONS).index('臺北市'), key='selected_city')
+districts = list(REGIONS[city]['districts'])
+default_district = '北投區' if city == '臺北市' else ('鼓山區' if city == '高雄市' else districts[0])
+district = st.sidebar.selectbox('行政區', districts, index=districts.index(default_district), key='district_' + city)
+st.caption(f'目前研究地區：{city} {district}')
 database_url = setting('DATABASE_URL')
 shared_database = bool(database_url)
+if st.session_state.get('_schema_version') != 'national-v2':
+    previous_engine = st.session_state.pop('_engine', None)
+    if previous_engine is not None:
+        previous_engine.dispose()
 if '_engine' not in st.session_state:
     try:
         st.session_state['_engine'] = connect(database_url or 'sqlite://')
-        snapshot = Path(__file__).resolve().parent / 'data' / 'a_lvr_land_a.csv'
-        if not shared_database and snapshot.exists():
-            save(st.session_state['_engine'], clean(snapshot.read_bytes(), snapshot.name), 'repository snapshot')
+        st.session_state['_schema_version'] = 'national-v2'
     except Exception:
         logging.exception('資料庫初始化失敗')
         st.error('資料庫連線或快照初始化失敗，請由管理者檢查 Cloud logs 與 Secrets。')
         st.stop()
 engine = st.session_state['_engine']
+snapshot_done = st.session_state.setdefault('_snapshots_done', {})
+if not shared_database and not snapshot_done.get(city):
+    snapshot = Path(__file__).resolve().parent / 'data' / filename_for_city(city)
+    if snapshot.exists():
+        try:
+            save(engine, clean(snapshot.read_bytes(), snapshot.name, city=city), 'repository snapshot')
+        except Exception:
+            logging.exception('所選縣市快照匯入失敗')
+            st.warning('所選縣市的儲存庫快照無法匯入，將嘗試官方自動下載。')
+    snapshot_done[city] = True
 page = st.sidebar.radio('功能', ['資料匯入與品質', '成交查詢', '可比估值', '房貸試算', '家庭現金流'])
 st.sidebar.markdown('[官方下載與授權](https://plvr.land.moi.gov.tw/DownloadOpenData)')
-st.sidebar.caption('只接受官方臺北市買賣主檔；空白畫面不會自動填入假行情。')
+st.sidebar.caption(f'目前接受 {city} 買賣主檔 {filename_for_city(city)} 或含該主檔的官方 ZIP；不填入假行情。')
 can_import = not shared_database
 if shared_database:
     st.sidebar.info('共用資料庫模式：瀏覽者可查詢；匯入需要管理密碼。')
@@ -513,20 +1054,22 @@ else:
 auto_enabled = str(setting('AUTO_LOAD', 'true')).lower() in ('true', '1', 'yes')
 if not shared_database and auto_enabled and page not in ('房貸試算', '家庭現金流'):
     st.sidebar.caption('首次開啟自動載入最近可取得的最多2季；官方資料快取6小時。')
+    attempted = st.session_state.setdefault('_auto_done_by_city', {})
+    stored_results = st.session_state.setdefault('_auto_results_by_city', {})
     if st.sidebar.button('重新取得官方資料'):
         cached_official_season.clear()
-        st.session_state.pop('_auto_attempted', None)
+        attempted.pop(city, None)
         st.session_state['_auto_force'] = True
-    if not st.session_state.get('_auto_attempted'):
-        st.session_state['_auto_attempted'] = True
+    if not attempted.get(city):
+        attempted[city] = True
         force = st.session_state.pop('_auto_force', False)
-        if force or load(engine).empty:
+        if force or load(engine, city).empty:
             results, successes = [], 0
             with st.spinner('正在自動取得內政部成交資料，首次載入可能需要一些時間…'):
                 progress = st.empty()
                 for auto_season in candidate_seasons(taipei_today()):
-                    progress.info(f'正在取得 {auto_season} 官方資料…')
-                    item = cached_official_season(auto_season, taipei_today())
+                    progress.info(f'正在取得 {city} {auto_season} 官方資料…')
+                    item = cached_official_season(auto_season, taipei_today(), city)
                     if item['ok']:
                         report = save(engine, item['frame'], item['metadata']['source_url'])
                         results.append({'season': auto_season, 'ok': True,
@@ -537,12 +1080,12 @@ if not shared_database and auto_enabled and page not in ('房貸試算', '家庭
                     if successes == 2:
                         break
                 progress.empty()
-            st.session_state['_auto_results'] = results
-    if st.session_state.get('_auto_results'):
-        auto_results = st.session_state['_auto_results']
+            stored_results[city] = results
+    if stored_results.get(city):
+        auto_results = stored_results[city]
         acquired = [x['season'] for x in auto_results if x['ok']]
         if acquired:
-            st.success('已自動載入官方資料：' + '、'.join(acquired))
+            st.success(f'已自動載入 {city} 官方資料：' + '、'.join(acquired))
             st.caption('這是近期可取得的季度資料，不代表完整兩年或即時行情；案例不足時仍不估價。')
         else:
             st.warning('官方自動下載暫時失敗。可按左側「重新取得官方資料」，或使用下方手動上傳；不代表沒有成交。')
@@ -561,7 +1104,7 @@ if page == '資料匯入與品質':
                 with tempfile.TemporaryDirectory() as folder:
                     path = Path(folder) / 'official.zip'
                     meta = download(season, path)
-                    report = save(engine, clean(path.read_bytes(), path.name), meta['source_url'])
+                    report = save(engine, clean(path.read_bytes(), path.name, city=city), meta['source_url'])
             st.success('匯入完成')
             st.json(report)
             st.json(meta)
@@ -569,22 +1112,24 @@ if page == '資料匯入與品質':
         except Exception as exc:
             logging.exception('官方下載/匯入失敗')
             st.error('下載/匯入失敗，請檢查季別或改從官方網頁下載 ZIP 再上傳；詳細原因請管理者查看 Cloud logs。')
-    uploaded = st.file_uploader('官方 ZIP 或 a_lvr_land_a.csv', type=['zip', 'csv'])
+    uploaded = st.file_uploader(f'官方 ZIP 或 {filename_for_city(city)}', type=['zip', 'csv'], key='upload_' + city)
     if st.button('匯入上傳檔', disabled=uploaded is None or not can_import) and can_import:
         try:
-            st.json(save(engine, clean(uploaded.getvalue(), uploaded.name), uploaded.name))
+            st.json(save(engine, clean(uploaded.getvalue(), uploaded.name, city=city), uploaded.name))
         except Exception as exc:
             logging.exception('上傳匯入失敗')
             st.error('匯入失敗，請確認來源、檔名與必要欄位；詳細原因請管理者查看 Cloud logs。')
-    frame = load(engine)
-    st.metric('資料庫原始交易版本數', len(frame))
+    frame = load(engine, city, district)
+    st.metric('所選地區原始交易版本數', len(frame))
     if len(frame):
         st.metric('清洗合格數（估值另檢查版本衝突）', int(frame.eligible.sum()))
         st.dataframe(frame.groupby(['eligible', 'reasons']).size().rename('筆數').reset_index(), hide_index=True)
         st.caption('備註非空一律需人工複核；因此一般文字備註也可能被保守排除。')
-        st.dataframe(frame[['address', 'trade_date', 'eligible', 'reasons', 'file_hash', 'source_line']], hide_index=True)
+        st.dataframe(frame[['city', 'district', 'address', 'trade_date', 'eligible', 'reasons', 'file_hash', 'source_line']], hide_index=True)
+    else:
+        st.info(f'{city}{district} 目前沒有已載入的交易。這不表示沒有成交；請檢查來源與季別。')
 elif page == '成交查詢':
-    frame = load(engine)
+    frame = load(engine, city, district)
     pool = frame[frame.eligible == True]
     if pool.empty:
         st.info('尚無合格成交資料，請先匯入官方買賣檔案。')
@@ -593,13 +1138,20 @@ elif page == '成交查詢':
         if road != '全部':
             pool = pool[pool.road == road]
         st.caption('單價及總價已扣除可明確拆分的車位；成交查詢可能含隔離中的更正版本，估值會另行排除。')
-        st.dataframe(pool[['road', 'building_type', 'trade_date', 'area_ping', 'unit_wan', 'net_price', 'age', 'floor']], hide_index=True)
+        st.dataframe(pool[['city', 'district', 'road', 'building_type', 'trade_date', 'area_ping', 'unit_wan', 'net_price', 'age', 'floor']], hide_index=True)
         st.download_button('匯出查詢 CSV', pool.to_csv(index=False).encode('utf-8-sig'), 'transactions.csv', 'text/csv')
 elif page == '可比估值':
     st.subheader('輸入待估房屋條件')
+    local = load(engine, city, district)
+    good = local[local.eligible == True]
+    roads = sorted(good.road.dropna().unique().tolist())
+    types = sorted(good.building_type.dropna().unique().tolist()) or ['公寓(5樓含以下無電梯)', '住宅大樓(11層含以上有電梯)', '華廈(10層含以下有電梯)', '透天厝']
+    preferred_road = '中央北路三段' if city == '臺北市' and district == '北投區' else (roads[0] if roads else '')
+    if roads:
+        st.caption('已載入的合格成交路段：' + '、'.join(roads[:20]))
     with st.form('target'):
-        road = st.text_input('完整路段（含段別，例如中央北路三段）', '中央北路三段')
-        kind = st.text_input('建物型態（須與官方資料完全一致）', '公寓(5樓含以下無電梯)')
+        road = st.text_input('完整路段（含段別）', preferred_road, key=f'road_{city}_{district}')
+        kind = st.selectbox('建物型態（官方分類）', types, key=f'type_{city}_{district}')
         area = st.number_input('不含車位建物移轉面積（坪，含公設）', 1.0, 300.0, 28.0)
         age = st.number_input('估值日屋齡（年）', 0.0, 150.0, 40.0)
         floor = st.number_input('所在樓層', 1, 100, 2)
@@ -608,7 +1160,7 @@ elif page == '可比估值':
         submit = st.form_submit_button('尋找可比成交並估值')
     if submit:
         try:
-            result = estimate(load(engine), Target(road, kind, area, age, floor, floors, as_of))
+            result = estimate(local, Target(road, kind, area, age, floor, floors, as_of, city, district))
             st.write(result['rules'])
             st.json(result['funnel'])
             if result['status'] == '資料不足':

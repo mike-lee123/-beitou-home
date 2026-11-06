@@ -1,79 +1,56 @@
-# 首購 Dashboard：自動資料＋房貸＋現金流
+# 全台首購｜成交、房貸與現金流
 
-將本包的 app.py 覆蓋原 GitHub 同名檔案並 Commit，等待 Streamlit 自動更新；套件清單不需改動。新版左側有資料匯入與品質、成交查詢、可比估值、房貸試算、家庭現金流五項。房貸及現金流可在沒有成交資料時獨立試算。請讀 FINANCE.md 的假設與限制。
+可直接部署到 Streamlit Community Cloud 的完整單檔 Python 專案。預設臺北市北投區；左側可選全台22縣市、368個鄉鎮市區，也可選高雄市鼓山區。房貸與現金流不需先匯入成交資料。
 
-## 自動取得版更新
+## 更新既有網站
 
-上傳新版 app.py 後，個人暫存模式首次開啟會自動取得官方季度成交資料，不必先下載或上傳。依台灣日期從最近完整季度往前最多檢查3季，載入最多2個可用季度。只共用官方公開資料的6小時快取，每個訪客資料庫仍獨立。右側顯示來源、季別、雜湊與排除統計；左側「重新取得官方資料」可清除快取並重試。下載失敗不代表沒有成交，仍保留手動匯入。此功能不保證完整兩年，也不是背景排程或即時更新。
+1. 使用本包新版 app.py 覆蓋 GitHub 儲存庫根目錄的同名檔案。
+2. requirements.txt 套件沒有新增；若原儲存庫缺少它，請一併上傳。
+3. 按 Commit changes，等 Streamlit 自動重新部署，重新開啟網站。
+4. 左側預設臺北市／北投區；改選高雄市後，行政區預設鼓山區，亦可選其他行政區。
+5. 個人暫存模式會自動取得所選縣市資料。已載入同縣市後切換行政區，直接使用同一縣市資料篩選；切換到其他縣市時會取得對應主檔，切回已載入縣市不重複下載。
 
-若已有隨儲存庫快照，先使用快照；需要新資料時按重新取得。外接共用資料庫時不由訪客自動寫入，維持管理者匯入模式。可在 Secrets 設定 AUTO_LOAD = "false" 關閉自動取得。
+初次部署：登入 https://share.streamlit.io ，Create app → 選GitHub儲存庫與main分支 → Main file path為app.py → Advanced settings選Python 3.11 → Deploy。基本模式Secrets留空，不需要OpenAI key。可設定可用的streamlit.app子網域，但免費服務不保證永久可用或永不休眠，詳見 https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app 。本次未登入使用者帳號完成線上部署。
 
-# 免費部署到 Streamlit Community Cloud
+## 使用方式
 
-這份專案包含完整 Python 程式碼，預設不需要 OpenAI API key、信用卡、Docker 或外部資料庫。下載 ZIP 並解壓縮後，請把**資料夾裡的檔案**上傳 GitHub 儲存庫根目錄。
+- 資料匯入與品質：自動載入近期可取得的最多2季，最多檢查3季；官方公開資料快取6小時。顯示所選行政區的原始版本數、合格數與排除原因。
+- 自動下載失敗可按「重新取得官方資料」，或從 https://plvr.land.moi.gov.tw/DownloadOpenData 依官方流程手動下載後上傳。失敗不代表零成交，不繞過存取限制。
+- 手動ZIP可含全台檔案，程式只讀目前所選縣市買賣主檔。CSV必須是該縣市官方原檔，例如臺北市a_lvr_land_a.csv、高雄市e_lvr_land_a.csv，勿將檔案改名混用。
+- 成交查詢只顯示所選縣市與行政區的合格交易，可依路段篩選及匯出CSV。
+- 可比估值只使用同縣市、同行政區、同路段及型態案例。路段可手動輸入；頁面列出已載入路段，建物型態下拉選單來自該地區資料。少於5筆不產生區間。
+- 房貸與現金流：預設可動用現金500萬、月實領12萬，均可修改。利率及費用是情境，不是銀行報價。修改表單後按計算更新，可下載逐月攤還及試算JSON。詳見FINANCE.md。
 
-## 先理解網址與儲存
+## 資料保存與外接資料庫
 
-部署後可得到固定的 `https://你的子網域.streamlit.app` 網址。**免費服務沒有「永久有效、永不休眠」的保證**：官方目前規定閒置 12 小時會休眠，訪客可點選喚醒；平台規範、帳號、儲存庫或應用刪除等仍會影響可用性。請勿把未部署的範例網址當成真實網站。
+預設每位訪客使用獨立記憶體SQLite；切換地區不清除已載入縣市，重新連線或重啟仍可能清空。個人試算不寫入成交資料庫。
 
-官方說明：[部署與網址](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy)、[休眠規則](https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app)、[本機儲存不保證持久](https://docs.streamlit.io/develop/concepts/connections/connecting-to-data)。查核日：2026-11-06。
+可在data/放置官方縣市CSV快照，例如data/a_lvr_land_a.csv、data/e_lvr_land_a.csv；首次選該縣市時匯入。請保留來源網址、季別、下載日期與SHA256憑證。快照不自動更新，且上傳GitHub後會公開。預設.gitignore忽略data，若用Git命令上傳，需自行明確加入公開檔案。
 
-預設使用每個訪客獨立的記憶體 SQLite；上傳/下載匯入的資料只在該連線暫存，重新整理、斷線或重啟後可能需要重新匯入。其他訪客不能修改你的暫存資料。這不會讓資料隨網址永久保存。
+如需共用保存，可在Cloud的Secrets設定DATABASE_URL與IMPORT_PASSWORD（勿上傳真密碼到GitHub）：
 
-## 1. 建立 GitHub 儲存庫
-
-1. 登入 [GitHub](https://github.com)，選擇 New repository。
-2. 名稱例如 `beitou-homevalue`，選擇 Public，建立儲存庫。
-3. 點 Add file → Upload files，將解壓縮專案內的檔案與資料夾一起上傳。不要只上傳 ZIP，也此單檔版本不需要 beitou 資料夾。
-4. Commit changes。至少要有 `app.py`、`requirements.txt`；建議整包上傳。`.streamlit/config.toml` 是選用外觀/上傳容量設定。某些系統隱藏點開頭資料夾，可手動在 GitHub 建立該路徑。
-
-## 2. 建立雲端應用
-
-1. 開啟 [Streamlit Community Cloud](https://share.streamlit.io)，以 GitHub 帳號登入並完成網站要求的授權。
-2. 點 Create app／Deploy an app，選擇剛才的 Repository。
-3. Branch 選 `main`，Main file path 填 `app.py`（若你把整個資料夾上傳成子目錄，則需填實際路徑，建議直接放根目錄）。
-4. App URL / Custom subdomain 可輸入 `beitou-homevalue-你的英文代號`；若名稱已被使用，換一個。
-5. Advanced settings 選擇 Python 3.11。基本模式 Secrets 留空。
-6. 點 Deploy，等套件安裝與啟動。成功後複製真正產生的 `streamlit.app` 網址分享。
-
-目前套件使用相容版本範圍；本次本機測試環境為 Python 3.9 / Streamlit 1.50，未登入你的帳號完成 Cloud 實測。Python 3.11 是此專案的建議雲端版本。部署失敗請先查看 Cloud logs，不要將密碼貼到公開 issue。
-
-## 3. 匯入與估值
-
-在「資料匯入與品質」輸入民國季別，例如 `114S4`，點「下載並匯入指定季別」。如果內政部網站拒絕雲端下載，請依[官方網頁](https://plvr.land.moi.gov.tw/DownloadOpenData)流程手動下載 ZIP，再上傳。也可上傳官方臺北市買賣主檔 `a_lvr_land_a.csv`。
-
-資料清洗後可進入成交查詢與可比估值。只有足夠的同類型實際成交才輸出區間，不將刊登開價當成成交價。詳細清洗、車位分拆及估值限制請讀 MODEL_NOTES.md。
-
-## 可選：讓每次開啟都有固定成交資料
-
-將官方臺北市買賣 CSV 以 `data/a_lvr_land_a.csv` 上傳 GitHub。未外接資料庫時，每個新連線會自動匯入這份快照，不需訪客重新下載。
-
-- 只放依法可公開的官方檔案，不要上傳個人提供的敏感資料。
-- 保留官方下載網址、季別、下載日期及 SHA256 來源憑證，例如 `data/source.json`。這些檔案會隨儲存庫公開。
-- 預設 .gitignore 忽略 data 資料；若用 Git 命令上傳，需明確執行 `git add -f data/a_lvr_land_a.csv data/source.json`，或使用 GitHub 網頁上傳。
-- 單季資料可能不足五筆可比，應逐季建立涵蓋期更完整的外接資料庫。檔案與大量訪客匯入會消耗免費主機資源；快照適合小型展示。
-- 版本庫裡的快照是固定版本，不會自動更新為最新實價。
-
-## 可選：外接 PostgreSQL 保存共用資料
-
-自行取得可連線的 PostgreSQL 服務，在 Cloud 的 Advanced settings / Secrets 貼入：
-
-```toml
+~~~toml
 DATABASE_URL = "postgresql+psycopg://USER:URL_ENCODED_PASSWORD@HOST:5432/DBNAME?sslmode=require"
-IMPORT_PASSWORD = "請換成自己設定的長管理密碼"
-```
+IMPORT_PASSWORD = "自行設定的長管理密碼"
+~~~
 
-這些是格式範例，需替換為真正的連線資訊；密碼的特殊字元需 URL 編碼。不要把 Secrets 寫進公開 GitHub。外接資料庫自己的免費額度、休眠、備份與保留政策另計，亦無永久免費保證。
+外接共用資料庫時不由訪客自動寫入，須輸入管理密碼才能手動下載/匯入；未設密碼時匯入關閉。查詢仍公開，只存可公開資料。資料庫供應商的免費額度、休眠與備份另計，本機SQLite檔在Cloud不保證持久。AUTO_LOAD = "false"可關閉自動取得。
 
-設定 DATABASE_URL 後資料由訪客共用。只有輸入正確管理密碼才能透過頁面匯入；未設管理密碼時，頁面匯入會關閉。頁面查詢仍是公開的，只應存放可公開成交資料。此密碼閘門是小型展示用途，並非完整多人權限或稽核系統。若把 DATABASE_URL 設成雲端本機 SQLite 檔，仍不保證資料保存。
+**舊資料庫升級：**全台版新增city欄位，使用transactions_v2與imports_v2新表，不刪除或改寫舊版transactions/imports。舊版資料不會自動遷移，需重新匯入官方檔案，避免跨縣市混淆。v2原始列雜湊包含縣市；同縣市原始列重複匯入不增加筆數。
 
-官方 [Secrets 操作說明](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management)。
+## 資料來源與模型
+
+行政區離線清單擷取自國土測繪中心官方 https://api.nlsc.gov.tw/other/ListCounty 與 https://api.nlsc.gov.tw/other/ListTown1/{countycode} ，2026-11-06查核，共22縣市368區。縣市字母代碼與官方114S4 ZIP全部22個買賣主檔核對。行政區如日後調整須更新清單。
+
+成交資料出處：內政部地政司。依官方使用規範取得並註明出處；本工具非官方認可鑑價服務。各縣市檔會清洗並保存所有行政區，頁面再按所選行政區篩選；不能把縣市匯入總筆數當成單一行政區成交數。
+
+詳細估值規則、缺失與限制見MODEL_NOTES.md；房貸假設見FINANCE.md；實測範圍見VALIDATION.md。
 
 ## 本機啟動
 
-```powershell
+~~~powershell
 python -m pip install -r requirements.txt
 python -m streamlit run app.py
-```
+~~~
 
-雲端單檔版包含完整 ETL、資料儲存、估值與頁面函式；原始模組專案另附完整測試。
+單檔版不需要beitou模組資料夾。另提供模組化原始專案與完整測試，給需要開發或CLI批次匯入者。
